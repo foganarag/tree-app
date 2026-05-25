@@ -1,3 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Abtirsi - Somali Genealogy</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #6ba3b5;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 500px;
+            background: #fdf8ed;
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        h1 { color: #4a7c8c; margin-bottom: 10px; }
+        p { color: #666; margin-bottom: 30px; }
+        .btn-google {
+            background: white;
+            color: #444;
+            border: 1px solid #ddd;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s;
+            margin: 10px;
+        }
+        .btn-google:hover { background: #f5f5f5; transform: scale(1.02); }
+        .btn-tree {
+            background: #d4a843;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            display: inline-block;
+            text-decoration: none;
+            margin: 10px;
+        }
+        .user-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e8e0c8;
+            border-radius: 12px;
+        }
+        .status { margin-top: 20px; font-size: 12px; color: #666; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div class="container">
+    <h1>🌳 Somali Abtirsi</h1>
+    <p>Preserving Somali clan genealogy through community consensus</p>
+    
+    <div id="loginSection">
+        <button id="googleSignInBtn" class="btn-google">🔐 Sign in with Google</button>
+    </div>
+    
+    <div id="userSection" style="display:none;">
+        <div class="user-info" id="userInfo"></div>
+        <a href="tree-viewer.html" class="btn-tree">🌲 View Clan Tree</a>
+        <button id="logoutBtn" class="btn-google">🚪 Sign Out</button>
+    </div>
+    
+    <div class="status" id="status">Welcome to Abtirsi</div>
+</div>
 <script>
     const SUPABASE_URL = 'https://dzgaaoawkvqjuoecytko.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6Z2Fhb2F3a3ZxanVvZWN5dGtvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NTg3NDYsImV4cCI6MjA5NDUzNDc0Nn0.dO9kp9u23s0MnSzVZ8cIQYCzD926RdrEaMBG0POxJ8k';
@@ -50,3 +132,5 @@
     
     checkSession();
 </script>
+</body>
+</html>
