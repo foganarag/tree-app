@@ -84,10 +84,10 @@
 <script>
     const SUPABASE_URL = 'https://dzgaaoawkvqjuoecytko.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6Z2Fhb2F3a3ZxanVvZWN5dGtvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NTg3NDYsImV4cCI6MjA5NDUzNDc0Nn0.dO9kp9u23s0MnSzVZ8cIQYCzD926RdrEaMBG0POxJ8k';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     
     async function checkSession() {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user } } = await _supabase.auth.getUser();
         if (user) {
             document.getElementById('loginSection').style.display = 'none';
             document.getElementById('userSection').style.display = 'block';
@@ -95,14 +95,14 @@
             document.getElementById('status').innerHTML = '✅ Signed in as ' + user.email;
             
             // Ensure user exists in user_reputations
-            const { data: existing } = await supabase
+            const { data: existing } = await _supabase
                 .from('user_reputations')
                 .select('email')
                 .eq('email', user.email)
                 .single();
             
             if (!existing) {
-                await supabase.from('user_reputations').insert([{
+                await _supabase.from('user_reputations').insert([{
                     email: user.email,
                     display_name: user.user_metadata?.full_name || user.email.split('@')[0],
                     role: 'public',
@@ -113,12 +113,12 @@
     }
     
     document.getElementById('googleSignInBtn').onclick = async () => {
-        const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+        const { error } = await _supabase.auth.signInWithOAuth({ provider: 'google' });
         if (error) alert('Error: ' + error.message);
     };
     
     document.getElementById('logoutBtn').onclick = async () => {
-        await supabase.auth.signOut();
+        await _supabase.auth.signOut();
         location.reload();
     };
     
