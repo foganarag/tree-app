@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Panel - Abtirsi</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #6ba3b5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #fdf8ed;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: #4a7c8c;
+            color: white;
+            padding: 20px 30px;
+        }
+        .content { padding: 30px; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th { background: #e8e0c8; color: #4a7c8c; }
+        input, button {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+        }
+        button {
+            background: #4a7c8c;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover { background: #3a6270; }
+        .btn-add { background: #d4a843; }
+        .btn-add:hover { background: #b8922a; }
+        .btn-remove { background: #c97e5a; }
+        .stats { margin-bottom: 20px; font-weight: bold; color: #4a7c8c; }
+        .status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.7);
+            padding: 8px 16px;
+            border-radius: 20px;
+            color: #0f0;
+            font-size: 12px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>👑 Admin Panel - Abtirsi Governance</h1>
+        <p>Add or remove moderators • Manage foundation members</p>
+    </div>
+    <div class="content">
+        <div class="stats" id="stats">Loading...</div>
+        
+        <h3>➕ Add New Moderator</h3>
+        <div style="display: flex; gap: 10px; margin-bottom: 30px;">
+            <input type="email" id="moderatorEmail" placeholder="moderator@example.com" style="flex:1">
+            <input type="text" id="moderatorName" placeholder="Display Name" style="flex:1">
+            <button id="addModeratorBtn" class="btn-add">➕ Add Moderator</button>
+        </div>
+        
+        <h3>👥 Current Moderators & Foundation Members</h3>
+        <table id="membersTable">
+            <thead>
+                <tr><th>Email</th><th>Name</th><th>Role</th><th>Points</th><th>Action</th></tr>
+            </thead>
+            <tbody id="membersList"></tbody>
+        </table>
+        
+        <h3 style="margin-top: 30px;">⚙️ Governance Settings</h3>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+            <div>Vote threshold: <strong id="voteThreshold">3</strong> votes minimum</div>
+            <div>Approval %: <strong id="approvalPercent">75</strong>%</div>
+            <div>Foundation target: <strong id="foundationTarget">35</strong> members</div>
+        </div>
+    </div>
+</div>
+<div class="status" id="status">Loading session...</div>
+
+<script>
+    const SUPABASE_URL = 'https://dzgaaoawkvqjuoecytko.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6Z2Fhb2F3a3ZxanVvZWN5dGtvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NTg3NDYsImV4cCI6MjA5NDUzNDc0Nn0.dO9kp9u23s0MnSzVZ8cIQYCzD926RdrEaMBG0POxJ8k';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
+    let currentUser = null;
+    
+    async function checkAdmin() {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            window.location.href = 'index.html';
+            return;
+        }
+        currentUser = user;
+        
+        // Check if user is admin
+        const { data } = await supabase
+            .from('user_reputations')
+            .select('role')
+            .eq('email', user.email)
+            .single();
+        
+        if (!data || data.role !== 'admin') {
+            document.body.innerHTML = '<div style="padding:40px;text-align:center;"><h1>Access Denied</h1><p>You are not an administrator.</p><a href="index.html">Go back</a></div>';
+            return;
+        }
+        
+        loadMembers();
+        document.getElementById('status').innerHTML = '✅ Admin: ' + user.email;
+    }
+    
+    async function loadMembers() {
+        const { data, error } = await supabase
+            .from('user_reputations')
+            .select('*')
+            .in('role', ['admin', 'moderator', 'foundation'])
+            .order('role', { ascending: false });
+        
+        if (error) { console.error(error); return; }
+        
+        document.getElementById('stats').innerHTML = `📊 Total members: ${data.length} (Target: 35 foundation)`;
+        
+        const tbody = document.getElementById('membersList');
+        tbody.innerHTML = '';
+        data.forEach(m => {
+            const row = tbody.insertRow();
+            row.insertCell(0).textContent = m.email;
+            row.insertCell(1).textContent = m.display_name || '-';
+            row.insertCell(2).textContent = m.role;
+            row.insertCell(3).textContent = m.points || 0;
+            const actionCell = row.insertCell(4);
+            if (m.role !== 'admin') {
+                const removeBtn = document.createElement('button');
+                removeBtn.textContent = 'Remove';
+                removeBtn.className = 'btn-remove';
+                removeBtn.onclick = () => removeModerator(m.email);
+                actionCell.appendChild(removeBtn);
+            } else {
+                actionCell.textContent = '—';
+            }
+        });
+    }
+    
+    async function addModerator() {
+        const email = document.getElementById('moderatorEmail').value.trim();
+        const name = document.getElementById('moderatorName').value.trim();
+        if (!email) { alert('Enter email address'); return; }
+        
+        document.getElementById('status').innerHTML = '💾 Adding moderator...';
+        
+        // Check if user exists, if not create basic record
+        const { data: existing } = await supabase
+            .from('user_reputations')
+            .select('email')
+            .eq('email', email)
+            .single();
+        
+        if (!existing) {
+            const { error } = await supabase
+                .from('user_reputations')
+                .insert([{ email: email, display_name: name || email.split('@')[0], role: 'moderator', points: 500 }]);
+            if (error) { alert('Error: ' + error.message); document.getElementById('status').innerHTML = '❌ Error'; return; }
+        } else {
+            const { error } = await supabase
+                .from('user_reputations')
+                .update({ role: 'moderator', display_name: name || existing.display_name })
+                .eq('email', email);
+            if (error) { alert('Error: ' + error.message); return; }
+        }
+        
+        document.getElementById('status').innerHTML = '✅ Moderator added!';
+        document.getElementById('moderatorEmail').value = '';
+        document.getElementById('moderatorName').value = '';
+        loadMembers();
+        setTimeout(() => document.getElementById('status').innerHTML = '✅ Admin: ' + currentUser.email, 2000);
+    }
+    
+    async function removeModerator(email) {
+        if (!confirm(`Remove ${email} from moderators?`)) return;
+        
+        const { error } = await supabase
+            .from('user_reputations')
+            .update({ role: 'public' })
+            .eq('email', email);
+        
+        if (error) { alert('Error: ' + error.message); return; }
+        document.getElementById('status').innerHTML = '✅ Moderator removed';
+        loadMembers();
+        setTimeout(() => document.getElementById('status').innerHTML = '✅ Admin: ' + currentUser.email, 2000);
+    }
+    
+    document.getElementById('addModeratorBtn').onclick = addModerator;
+    checkAdmin();
+</script>
+</body>
+</html>

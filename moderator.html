@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Moderator Dashboard - Abtirsi</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #6ba3b5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #fdf8ed;
+            border-radius: 16px;
+            overflow: hidden;
+        }
+        .header {
+            background: #4a7c8c;
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .content { padding: 30px; }
+        .pending-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 5px solid #d4a843;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .clan-path {
+            font-size: 18px;
+            font-weight: bold;
+            color: #4a7c8c;
+            margin-bottom: 10px;
+        }
+        .submitted-by {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 15px;
+        }
+        .vote-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .btn-approve {
+            background: #4caf50;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .btn-reject {
+            background: #c97e5a;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .vote-status {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
+        }
+        .status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.7);
+            padding: 8px 16px;
+            border-radius: 20px;
+            color: #0f0;
+            font-size: 12px;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+        }
+        .logout-btn {
+            background: #c97e5a;
+            padding: 5px 15px;
+            border-radius: 20px;
+            color: white;
+            text-decoration: none;
+            font-size: 12px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div>
+            <h1>⚖️ Moderator Dashboard</h1>
+            <p>Approve or reject clan path submissions</p>
+        </div>
+        <div class="user-info" id="userInfo">
+            <span id="userName"></span>
+            <a href="index.html" class="logout-btn">Logout</a>
+        </div>
+    </div>
+    <div class="content">
+        <h2>📋 Pending Clan Paths (Needs 3 votes)</h2>
+        <div id="pendingList"></div>
+    </div>
+</div>
+<div class="status" id="status">Loading...</div>
+
+<script>
+    const SUPABASE_URL = 'https://dzgaaoawkvqjuoecytko.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6Z2Fhb2F3a3ZxanVvZWN5dGtvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NTg3NDYsImV4cCI6MjA5NDUzNDc0Nn0.dO9kp9u23s0MnSzVZ8cIQYCzD926RdrEaMBG0POxJ8k';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
+    let currentUser = null;
+    let voteThreshold = 3;
+    let approvalPercent = 75;
+    
+    async function checkModerator() {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            window.location.href = 'index.html';
+            return;
+        }
+        currentUser = user;
+        
+        const { data } = await supabase
+            .from('user_reputations')
+            .select('role, display_name')
+            .eq('email', user.email)
+            .single();
+        
+        if (!data || (data.role !== 'moderator' && data.role !== 'admin' && data.role !== 'foundation')) {
+            document.body.innerHTML = '<div style="padding:40px;text-align:center;"><h1>Access Denied</h1><p>You are not a moderator.</p><a href="index.html">Go back</a></div>';
+            return;
+        }
+        
+        document.getElementById('userName').innerHTML = `👤 ${data.display_name || user.email.split('@')[0]}`;
+        document.getElementById('status').innerHTML = '✅ Moderator: ' + user.email;
+        
+        loadPendingSubmissions();
+    }
+    
+    async function loadPendingSubmissions() {
+        const { data, error } = await supabase
+            .from('pending_clan_paths')
+            .select('*')
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false });
+        
+        if (error) { console.error(error); return; }
+        
+        const container = document.getElementById('pendingList');
+        if (!data || data.length === 0) {
+            container.innerHTML = '<p style="text-align:center;padding:40px;">✅ No pending submissions. Great job!</p>';
+            return;
+        }
+        
+        container.innerHTML = '';
+        for (const pending of data) {
+            // Get current votes
+            const { data: votes } = await supabase
+                .from('votes')
+                .select('vote')
+                .eq('pending_id', pending.id);
+            
+            const approveCount = votes?.filter(v => v.vote === true).length || 0;
+            const rejectCount = votes?.filter(v => v.vote === false).length || 0;
+            const hasVoted = votes?.some(v => v.voter_email === currentUser.email);
+            
+            // Build clan path display
+            const levels = [];
+            if (pending.level_1) levels.push(pending.level_1);
+            if (pending.level_2) levels.push(pending.level_2);
+            if (pending.level_3) levels.push(pending.level_3);
+            if (pending.level_4) levels.push(pending.level_4);
+            if (pending.level_5) levels.push(pending.level_5);
+            if (pending.level_6) levels.push(pending.level_6);
+            if (pending.level_7) levels.push(pending.level_7);
+            const pathDisplay = levels.join(' > ');
+            
+            const card = document.createElement('div');
+            card.className = 'pending-card';
+            card.innerHTML = `
+                <div class="clan-path">📁 ${pathDisplay}</div>
+                <div class="submitted-by">Submitted by: ${pending.submitted_by_name || pending.submitted_by_email} | ${new Date(pending.created_at).toLocaleDateString()}</div>
+                <div class="vote-buttons">
+                    ${!hasVoted ? `<button class="btn-approve" data-id="${pending.id}" data-vote="approve">✅ Approve</button>
+                     <button class="btn-reject" data-id="${pending.id}" data-vote="reject">❌ Reject</button>` : '<span>✅ You have already voted on this</span>'}
+                </div>
+                <div class="vote-status">🗳️ Votes: ${approveCount} approve / ${rejectCount} reject (Need ${voteThreshold} votes, ${approvalPercent}% approval)</div>
+            `;
+            container.appendChild(card);
+        }
+        
+        // Add event listeners
+        document.querySelectorAll('.btn-approve').forEach(btn => {
+            btn.onclick = () => castVote(btn.dataset.id, true);
+        });
+        document.querySelectorAll('.btn-reject').forEach(btn => {
+            btn.onclick = () => castVote(btn.dataset.id, false);
+        });
+    }
+    
+    async function castVote(pendingId, voteValue) {
+        document.getElementById('status').innerHTML = '💾 Recording vote...';
+        
+        // Record vote
+        const { error: voteError } = await supabase
+            .from('votes')
+            .insert([{
+                pending_id: parseInt(pendingId),
+                voter_email: currentUser.email,
+                vote: voteValue
+            }]);
+        
+        if (voteError) { alert('Error: ' + voteError.message); document.getElementById('status').innerHTML = '❌ Error'; return; }
+        
+        // Get updated vote counts
+        const { data: votes } = await supabase
+            .from('votes')
+            .select('vote')
+            .eq('pending_id', parseInt(pendingId));
+        
+        const approveCount = votes.filter(v => v.vote === true).length;
+        const rejectCount = votes.filter(v => v.vote === false).length;
+        const totalVotes = approveCount + rejectCount;
+        const approvalPercentActual = totalVotes > 0 ? (approveCount / totalVotes) * 100 : 0;
+        
+        // Check if threshold reached
+        if (totalVotes >= voteThreshold) {
+            const newStatus = approvalPercentActual >= approvalPercent ? 'approved' : 'rejected';
+            
+            const { error: updateError } = await supabase
+                .from('pending_clan_paths')
+                .update({ status: newStatus, vote_count: totalVotes })
+                .eq('id', parseInt(pendingId));
+            
+            if (!updateError && newStatus === 'approved') {
+                // Move to main clan_paths table
+                const pending = await supabase.from('pending_clan_paths').select('*').eq('id', parseInt(pendingId)).single();
+                if (pending.data) {
+                    await supabase.from('clan_paths').insert([{
+                        level_1: pending.data.level_1, level_2: pending.data.level_2,
+                        level_3: pending.data.level_3, level_4: pending.data.level_4,
+                        level_5: pending.data.level_5, level_6: pending.data.level_6,
+                        level_7: pending.data.level_7
+                    }]);
+                }
+            }
+            document.getElementById('status').innerHTML = `✅ Vote recorded! Submission ${newStatus}.`;
+        } else {
+            document.getElementById('status').innerHTML = `✅ Vote recorded! (${totalVotes}/${voteThreshold} votes)`;
+        }
+        
+        loadPendingSubmissions();
+        setTimeout(() => document.getElementById('status').innerHTML = '✅ Moderator: ' + currentUser.email, 2000);
+    }
+    
+    checkModerator();
+</script>
+</body>
+</html>
