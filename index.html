@@ -1,49 +1,52 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Auth Test - Abtirsi</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head>
-<body>
-    <h1>Supabase Auth Test</h1>
-    <button id="googleBtn">Sign in with Google</button>
-    <pre id="output">Loading...</pre>
-
-    <script>
-        // ========== REPLACE WITH YOUR ACTUAL KEYS ==========
-        const SUPABASE_URL = 'YOUR_SUPABASE_URL_HERE';
-        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY_HERE';
-        // ===================================================
-        
-        const output = document.getElementById('output');
-        
-        // Check if keys are configured
-        if (SUPABASE_URL === 'YOUR_SUPABASE_URL_HERE') {
-            output.innerHTML = '❌ ERROR: Please replace SUPABASE_URL with your actual Supabase URL';
-        } else if (SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY_HERE') {
-            output.innerHTML = '❌ ERROR: Please replace SUPABASE_ANON_KEY with your actual anon key';
-        } else {
-            output.innerHTML = '✅ Keys configured. Initializing Supabase...';
+<script>
+    const SUPABASE_URL = 'https://dzgaaoawkvqjuoecytko.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6Z2Fhb2F3a3ZxanVvZWN5dGtvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg5NTg3NDYsImV4cCI6MjA5NDUzNDc0Nn0.dO9kp9u23s0MnSzVZ8cIQYCzD926RdrEaMBG0POxJ8k';
+    
+    // Create supabase client (SINGLE declaration, no duplicates)
+    const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
+    async function checkSession() {
+        const { data: { user } } = await _supabase.auth.getUser();
+        if (user) {
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('userSection').style.display = 'block';
+            document.getElementById('userInfo').innerHTML = `👋 Welcome, ${user.email}<br><small>Signed in with Google</small>`;
+            document.getElementById('status').innerHTML = '✅ Signed in as ' + user.email;
             
-            try {
-                const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                output.innerHTML = '✅ Supabase client created. Ready to sign in.';
-                
-                document.getElementById('googleBtn').onclick = async () => {
-                    output.innerHTML = '🔄 Attempting Google sign in...';
-                    try {
-                        const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
-                        if (error) throw error;
-                        output.innerHTML = '✅ Redirecting to Google...';
-                    } catch (err) {
-                        output.innerHTML = '❌ Error: ' + err.message;
-                    }
-                };
-                
-            } catch (err) {
-                output.innerHTML = '❌ Failed to create Supabase client: ' + err.message;
+            // Ensure user exists in user_reputations
+            const { data: existing } = await _supabase
+                .from('user_reputations')
+                .select('email')
+                .eq('email', user.email)
+                .single();
+            
+            if (!existing) {
+                await _supabase.from('user_reputations').insert([{
+                    email: user.email,
+                    display_name: user.user_metadata?.full_name || user.email.split('@')[0],
+                    role: 'public',
+                    points: 10
+                }]);
             }
         }
-    </script>
-</body>
-</html>
+    }
+    
+    // Make sure button exists before adding event listener
+    const googleBtn = document.getElementById('googleSignInBtn');
+    if (googleBtn) {
+        googleBtn.onclick = async () => {
+            const { error } = await _supabase.auth.signInWithOAuth({ provider: 'google' });
+            if (error) alert('Error: ' + error.message);
+        };
+    }
+    
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.onclick = async () => {
+            await _supabase.auth.signOut();
+            location.reload();
+        };
+    }
+    
+    checkSession();
+</script>
